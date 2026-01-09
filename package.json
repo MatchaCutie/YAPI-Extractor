@@ -1,0 +1,32 @@
+{
+  "name": "yapi-extractor",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "YAPI接口文档提取器MCP服务器 - 自动登录YAPI系统，解析接口JSON Schema，生成mock数据和TypeScript类型定义，支持保存到本地或YAPI高级Mock",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "dev": "ts-node src/index.ts",
+    "clean": "rm -rf build"
+  },
+  "keywords": [
+    "mcp",
+    "yapi",
+    "mock",
+    "typescript",
+    "api"
+  ],
+  "author": "Cline",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
