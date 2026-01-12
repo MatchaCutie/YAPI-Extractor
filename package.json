@@ -5,7 +5,7 @@
   "description": "YAPI接口文档提取器MCP服务器 - 自动登录YAPI系统，解析接口JSON Schema，生成mock数据和TypeScript类型定义，支持保存到本地或YAPI高级Mock",
   "main": "build/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --format=esm --outfile=build/index.js --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "start": "node build/index.js",
     "dev": "ts-node src/index.ts",
     "clean": "rm -rf build"
@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "esbuild": "^0.20.0",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0"
   }

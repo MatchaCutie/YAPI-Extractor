@@ -3,3 +3,4 @@ build/
 mock/
 *.log
 .env*
+package-lock.json
