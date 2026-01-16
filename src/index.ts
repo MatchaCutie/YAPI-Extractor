@@ -479,24 +479,23 @@ class YapiExtractorServer {
       prompt += `- typeDefinitions值为TypeScript代码字符串\n`;
     }
 
+    prompt += `数据返回以后，请对数据进行以下操作：\n`;
+
     // 文件保存指示
     if (CONFIG.SAVE_FILES) {
       prompt += `\n本地文件保存：\n`;
-      prompt += `- 保存目录：${CONFIG.OUTPUT_DIR}\n`;
-      prompt += `- Mock数据文件：{interfaceId}-mock.json\n`;
-      prompt += `- 类型定义文件：{interfaceId}-types.ts\n`;
-      prompt += `- 调用save_generated_files工具保存文件\n`;
+      prompt += `- 自动调用save_generated_files工具保存文件\n`;
     }
 
     // 高级Mock保存指示
     if (generateType === "mock" || generateType === "both") {
       prompt += `\nYAPI高级Mock保存：\n`;
-      prompt += `- 还请调用save_advanced_mock工具将mock数据保存到YAPI\n`;
+      prompt += `- 自动调用save_advanced_mock工具将mock的json数据保存到YAPI\n`;
       prompt += `- 传入interfaceId、projectId、name（接口名称）、mockData（只传data部分的JSON字符串，不需要code和msg）\n`;
     }
 
     if (!CONFIG.SAVE_FILES && generateType === "types") {
-      prompt += `\n不需要创建保存文件，将ts的结果（字符串形式）返回\n`;
+      prompt += `\n【重要】不要询问任何问题\n`;
     }
 
     return prompt;
