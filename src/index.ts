@@ -64,6 +64,11 @@ interface YapiInterfaceResponse {
     path: string;
     res_body: string;
     res_body_type: string;
+    req_body_other: string;
+    req_body_type: string;
+    req_body_is_json_schema: boolean;
+    req_query: Array<{ name: string; desc: string; required: string; example: string }>;
+    req_params: Array<{ name: string; desc: string }>;
   };
 }
 
@@ -87,7 +92,8 @@ class YapiExtractorServer {
 
     this.server = new Server({
       name: "yapi-extractor",
-      version: "1.0.0",
+      version: "1.1.0",
+      description: "YAPI接口工具：支持按路径搜索接口、获取接口详情并生成Mock数据和TypeScript类型定义、保存高级Mock到YAPI系统",
     });
 
     this.setupToolHandlers();
@@ -108,8 +114,22 @@ class YapiExtractorServer {
       return {
         tools: [
           {
+            name: "search_yapi_interface",
+            description: "按接口路径搜索YAPI接口，返回匹配的接口ID、名称、项目ID等信息。在不知道接口ID时，先用此工具查找",
+            inputSchema: {
+              type: "object",
+              properties: {
+                path: {
+                  type: "string",
+                  description: "接口路径，如 /app/aiCoach/saveExercisePlan",
+                },
+              },
+              required: ["path"],
+            },
+          },
+          {
             name: "extract_yapi_interface",
-            description: "从YAPI接口文档获取返回数据类型，然后解析接口结构并返回分析结果JSON Schema",
+            description: "从YAPI接口文档获取接口详情（入参、出参），解析接口结构并返回分析结果JSON Schema",
             inputSchema: {
               type: "object",
               properties: {
@@ -184,6 +204,8 @@ class YapiExtractorServer {
       const { name, arguments: args } = request.params;
 
       switch (name) {
+        case "search_yapi_interface":
+          return await this.handleSearchYapiInterface(args);
         case "extract_yapi_interface":
           return await this.handleExtractYapiInterface(args);
         case "save_generated_files":
@@ -197,6 +219,60 @@ class YapiExtractorServer {
           );
       }
     });
+  }
+
+  private async handleSearchYapiInterface(args: any) {
+    const { path: interfacePath } = args;
+
+    try {
+      await this.loginToYapi();
+
+      const searchUrl = `${CONFIG.YAPI_BASE_URL}/api/project/search?q=${encodeURIComponent(interfacePath)}`;
+      const response = await axios.get(searchUrl, {
+        timeout: 10000,
+        headers: {
+          Cookie: this.cookies.join("; "),
+        },
+        httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+      });
+
+      const { errcode, errmsg, data } = response.data;
+      if (errcode !== 0) {
+        throw new Error(`搜索失败: ${errmsg}`);
+      }
+
+      const interfaces: any[] = data?.interface ?? [];
+      if (interfaces.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `未找到路径匹配 "${interfacePath}" 的接口`,
+            },
+          ],
+        };
+      }
+
+      const result = interfaces.map((item: any) => ({
+        interfaceId: String(item._id),
+        projectId: String(item.projectId),
+        title: item.title,
+      }));
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `搜索YAPI接口失败: ${error}`
+      );
+    }
   }
 
   private async loginToYapi(): Promise<void> {
@@ -290,6 +366,16 @@ class YapiExtractorServer {
       // 提取data字段的schema（实际业务数据结构）
       const resSchema = fullResSchema.properties?.data || fullResSchema;
 
+      // 解析入参Schema
+      let reqSchema: JsonSchema | null = null;
+      if (interfaceData.data.req_body_other) {
+        try {
+          reqSchema = this.parseJsonSchema(interfaceData.data.req_body_other);
+        } catch (_) {
+          // 解析失败则忽略
+        }
+      }
+
       // 构建详细的提示词
       const prompt = this.buildGenerationPrompt(interfaceData, resSchema, generateType);
 
@@ -301,7 +387,8 @@ class YapiExtractorServer {
         method: interfaceData.data.method,
         path: interfaceData.data.path,
         schemas: {
-          response: resSchema
+          request: reqSchema,
+          response: resSchema,
         },
         prompt: prompt,
         shouldSaveFiles: CONFIG.SAVE_FILES,
@@ -440,6 +527,15 @@ class YapiExtractorServer {
     prompt += `- 接口名称：${interfaceData.data.title}\n`;
     prompt += `- 请求方法：${interfaceData.data.method}\n`;
     prompt += `- 接口路径：${interfaceData.data.path}\n\n`;
+
+    // 添加入参Schema信息
+    if (interfaceData.data.req_body_other) {
+      try {
+        const reqSchema = JSON.parse(interfaceData.data.req_body_other);
+        prompt += `请求体（入参）结构：\n`;
+        prompt += JSON.stringify(reqSchema, null, 2) + '\n\n';
+      } catch (_) {}
+    }
 
     // 添加响应Schema信息
     prompt += `响应数据结构：\n`;
